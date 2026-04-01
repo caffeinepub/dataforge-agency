@@ -2,7 +2,6 @@ import {
   Database,
   FileText,
   Key,
-  LogIn,
   MessageSquare,
   Pencil,
   Plus,
@@ -21,20 +20,20 @@ import type {
 } from "../backend";
 import AnimatedSection from "../components/AnimatedSection";
 import { useActor } from "../hooks/useActor";
-import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 type Tab = "content" | "services" | "team" | "submissions";
 
+const SESSION_KEY = "df_admin_session";
+
 export default function Admin() {
   const { actor } = useActor();
-  const { identity, login, isLoggingIn } = useInternetIdentity();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+  const [password, setPassword] = useState("");
+  const [isAdmin, setIsAdmin] = useState<boolean>(
+    () => sessionStorage.getItem(SESSION_KEY) === "1",
+  );
+  const [verifying, setVerifying] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [activeTab, setActiveTab] = useState<Tab>("content");
-
-  // Admin claim state
-  const [adminSecret, setAdminSecret] = useState("");
-  const [claiming, setClaiming] = useState(false);
-  const [claimError, setClaimError] = useState("");
 
   const [content, setContent] = useState<ContentState>({
     heroHeadline: "",
@@ -54,58 +53,69 @@ export default function Admin() {
 
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
 
-  useEffect(() => {
-    if (!actor || !identity) {
-      setIsAdmin(null);
-      return;
-    }
-    actor.isCallerAdmin().then(setIsAdmin);
-  }, [actor, identity]);
+  const savedPassword = sessionStorage.getItem(`${SESSION_KEY}_pw`) || "";
 
   const loadData = useCallback(async () => {
     if (!actor) return;
-    const [s, t, c, sub] = await Promise.all([
+    const pw = sessionStorage.getItem(`${SESSION_KEY}_pw`) || "";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const a = actor as any;
+    const [s, t, c, subResult] = await Promise.all([
       actor.getServices(),
       actor.getTeam(),
       actor.getContent(),
-      actor.getContactSubmissions().catch(() => [] as ContactSubmission[]),
+      a.adminGetContactSubmissions(pw),
     ]);
-    setServices(s.sort((a, b) => Number(a.order) - Number(b.order)));
-    setTeam(t.sort((a, b) => Number(a.order) - Number(b.order)));
+    setServices(
+      s.sort((a: Service, b: Service) => Number(a.order) - Number(b.order)),
+    );
+    setTeam(
+      t.sort(
+        (a: TeamMember, b: TeamMember) => Number(a.order) - Number(b.order),
+      ),
+    );
     setContent(c);
-    setSubmissions(sub);
+    if (subResult?.[0]) setSubmissions(subResult[0]);
   }, [actor]);
 
   useEffect(() => {
-    if (isAdmin) loadData();
-  }, [isAdmin, loadData]);
+    if (isAdmin && actor) loadData();
+  }, [isAdmin, actor, loadData]);
 
-  const claimAdmin = async () => {
-    if (!actor || !adminSecret.trim()) return;
-    setClaiming(true);
-    setClaimError("");
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const success: boolean = await (actor as any).claimAdminWithPassword(
-        adminSecret.trim(),
-      );
-      if (success) {
-        setIsAdmin(true);
-      } else {
-        setClaimError("Invalid password. Please try again.");
-      }
-    } catch {
-      setClaimError("Invalid password. Please try again.");
-    } finally {
-      setClaiming(false);
+  const ADMIN_PASSWORD = "DataForge@2024";
+
+  const handleLogin = async () => {
+    if (!password.trim()) return;
+    setVerifying(true);
+    setLoginError("");
+    // Check password client-side -- no backend call needed for auth
+    await new Promise((r) => setTimeout(r, 300)); // small delay for UX
+    if (password.trim() === ADMIN_PASSWORD) {
+      sessionStorage.setItem(SESSION_KEY, "1");
+      sessionStorage.setItem(`${SESSION_KEY}_pw`, password.trim());
+      setIsAdmin(true);
+    } else {
+      setLoginError("Incorrect password.");
     }
+    setVerifying(false);
   };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(`${SESSION_KEY}_pw`);
+    setIsAdmin(false);
+    setPassword("");
+  };
+
+  const getPw = () =>
+    sessionStorage.getItem(`${SESSION_KEY}_pw`) || savedPassword;
 
   const saveContent = async () => {
     if (!actor) return;
     setContentSaving(true);
     try {
-      await actor.updateContent(content);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (actor as any).adminUpdateContent(getPw(), content);
       setContentSaved(true);
       setTimeout(() => setContentSaved(false), 3000);
     } finally {
@@ -115,17 +125,21 @@ export default function Admin() {
 
   const deleteService = async (id: bigint) => {
     if (!actor || !confirm("Delete this service?")) return;
-    await actor.deleteService(id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (actor as any).adminDeleteService(getPw(), id);
     setServices((prev) => prev.filter((s) => s.id !== id));
   };
 
   const saveService = async (service: Service) => {
     if (!actor) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const a = actor as any;
     if (service.id === 0n) {
-      const id = await actor.createService(service);
-      setServices((prev) => [...prev, { ...service, id }]);
+      const result = await a.adminCreateService(getPw(), service);
+      const newId = result && result[0] !== undefined ? result[0] : 0n;
+      setServices((prev) => [...prev, { ...service, id: newId }]);
     } else {
-      await actor.updateService(service);
+      await a.adminUpdateService(getPw(), service);
       setServices((prev) =>
         prev.map((s) => (s.id === service.id ? service : s)),
       );
@@ -135,110 +149,75 @@ export default function Admin() {
 
   const deleteMember = async (id: bigint) => {
     if (!actor || !confirm("Delete this team member?")) return;
-    await actor.deleteTeamMember(id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (actor as any).adminDeleteTeamMember(getPw(), id);
     setTeam((prev) => prev.filter((m) => m.id !== id));
   };
 
   const saveMember = async (member: TeamMember) => {
     if (!actor) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const a = actor as any;
     if (member.id === 0n) {
-      const id = await actor.createTeamMember(member);
-      setTeam((prev) => [...prev, { ...member, id }]);
+      const result = await a.adminCreateTeamMember(getPw(), member);
+      const newId = result && result[0] !== undefined ? result[0] : 0n;
+      setTeam((prev) => [...prev, { ...member, id: newId }]);
     } else {
-      await actor.updateTeamMember(member);
+      await a.adminUpdateTeamMember(getPw(), member);
       setTeam((prev) => prev.map((m) => (m.id === member.id ? member : m)));
     }
     setEditingMember(null);
   };
 
-  if (!identity) {
-    return (
-      <div className="pt-24 min-h-screen flex items-center justify-center">
-        <AnimatedSection>
-          <div className="df-card p-10 max-w-md w-full text-center">
-            <div className="w-16 h-16 rounded-2xl btn-gradient flex items-center justify-center mx-auto mb-6">
-              <Shield className="w-8 h-8 text-white" />
-            </div>
-            <h1 className="text-white font-extrabold text-2xl mb-2">
-              Admin CMS Panel
-            </h1>
-            <p className="text-slate-400 mb-8">
-              Sign in with Internet Identity to access the content management
-              panel.
-            </p>
-            <button
-              type="button"
-              onClick={login}
-              disabled={isLoggingIn}
-              className="btn-gradient text-white font-bold px-8 py-3.5 rounded-full w-full flex items-center justify-center gap-2 disabled:opacity-60"
-            >
-              <LogIn className="w-4 h-4" />
-              {isLoggingIn ? "Connecting..." : "Sign In with Internet Identity"}
-            </button>
-          </div>
-        </AnimatedSection>
-      </div>
-    );
-  }
-
-  if (isAdmin === null) {
-    return (
-      <div className="pt-24 min-h-screen flex items-center justify-center">
-        <div className="text-slate-400">Verifying access...</div>
-      </div>
-    );
-  }
-
+  // Login screen
   if (!isAdmin) {
     return (
       <div className="pt-24 min-h-screen flex items-center justify-center px-4">
         <AnimatedSection>
           <div className="df-card p-10 max-w-md w-full">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 rounded-2xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center mx-auto mb-4">
-                <Key className="w-8 h-8 text-cyan-400" />
+              <div className="w-16 h-16 rounded-2xl btn-gradient flex items-center justify-center mx-auto mb-6">
+                <Shield className="w-8 h-8 text-white" />
               </div>
               <h1 className="text-white font-extrabold text-2xl mb-2">
-                Claim Admin Access
+                Admin Login
               </h1>
               <p className="text-slate-400 text-sm">
-                Enter your admin password to gain access to the CMS panel.
+                Enter your admin password to access the CMS panel.
               </p>
             </div>
             <div className="space-y-4">
               <div>
                 <label
-                  htmlFor="admin-secret"
+                  htmlFor="admin-password"
                   className="block text-slate-300 text-sm font-medium mb-1.5"
                 >
-                  Admin Password
+                  Password
                 </label>
                 <input
-                  id="admin-secret"
+                  id="admin-password"
                   type="password"
-                  value={adminSecret}
-                  onChange={(e) => setAdminSecret(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && claimAdmin()}
-                  placeholder="Enter your admin password..."
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  placeholder="Enter admin password..."
+                  autoComplete="current-password"
                   className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-400/50 focus:ring-1 focus:ring-cyan-400/30 transition-all"
                 />
               </div>
-              {claimError && (
-                <p className="text-red-400 text-sm">{claimError}</p>
+              {loginError && (
+                <p className="text-red-400 text-sm">{loginError}</p>
               )}
               <button
                 type="button"
-                onClick={claimAdmin}
-                disabled={claiming || !adminSecret.trim()}
+                onClick={handleLogin}
+                disabled={verifying || !password.trim()}
                 className="btn-gradient text-white font-bold px-8 py-3.5 rounded-full w-full flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                <Shield className="w-4 h-4" />
-                {claiming ? "Verifying..." : "Claim Admin Access"}
+                <Key className="w-4 h-4" />
+                {verifying ? "Verifying..." : "Sign In"}
               </button>
             </div>
-            <p className="text-slate-500 text-xs text-center mt-6">
-              Contact your administrator for the password.
-            </p>
           </div>
         </AnimatedSection>
       </div>
@@ -266,13 +245,22 @@ export default function Admin() {
 
   return (
     <div className="pt-24 pb-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div className="mb-8">
-        <h1 className="text-white font-extrabold text-3xl mb-1">
-          CMS <span className="gradient-text">Panel</span>
-        </h1>
-        <p className="text-slate-400 text-sm">
-          Manage your website content, services, and team.
-        </p>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-white font-extrabold text-3xl mb-1">
+            CMS <span className="gradient-text">Panel</span>
+          </h1>
+          <p className="text-slate-400 text-sm">
+            Manage your website content, services, and team.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="bg-white/5 border border-white/10 text-slate-400 text-sm font-medium px-4 py-2 rounded-full hover:text-white transition-colors"
+        >
+          Sign Out
+        </button>
       </div>
 
       <div className="flex gap-2 mb-8 flex-wrap">
@@ -542,11 +530,7 @@ function ServiceForm({
   service,
   onSave,
   onCancel,
-}: {
-  service: Service;
-  onSave: (s: Service) => void;
-  onCancel: () => void;
-}) {
+}: { service: Service; onSave: (s: Service) => void; onCancel: () => void }) {
   const [form, setForm] = useState<Service>(service);
   return (
     <div className="df-card p-6 mb-6">

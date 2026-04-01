@@ -66,6 +66,16 @@ export interface _SERVICE {
   'updateContent' : ActorMethod<[ContentState], undefined>,
   'updateService' : ActorMethod<[Service], undefined>,
   'updateTeamMember' : ActorMethod<[TeamMember], undefined>,
+  // Password-based admin functions (no Internet Identity required)
+  'adminVerifyPassword' : ActorMethod<[string], boolean>,
+  'adminGetContactSubmissions' : ActorMethod<[string], [] | [Array<ContactSubmission>]>,
+  'adminUpdateContent' : ActorMethod<[string, ContentState], boolean>,
+  'adminCreateService' : ActorMethod<[string, Service], [] | [bigint]>,
+  'adminUpdateService' : ActorMethod<[string, Service], boolean>,
+  'adminDeleteService' : ActorMethod<[string, bigint], boolean>,
+  'adminCreateTeamMember' : ActorMethod<[string, TeamMember], [] | [bigint]>,
+  'adminUpdateTeamMember' : ActorMethod<[string, TeamMember], boolean>,
+  'adminDeleteTeamMember' : ActorMethod<[string, bigint], boolean>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

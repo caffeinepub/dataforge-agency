@@ -18,23 +18,17 @@ actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
+  // Hardcoded admin password
+  let ADMIN_PASSWORD = "DataForge@2024";
+
+  func isValidAdmin(password : Text) : Bool {
+    password == ADMIN_PASSWORD;
+  };
+
   // Helper function for admin authorization
   func assertAdmin(caller : Principal) {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can perform this action");
-    };
-  };
-
-  // Hardcoded admin password claim
-  let ADMIN_PASSWORD = "DataForge@2024";
-
-  public shared ({ caller }) func claimAdminWithPassword(password : Text) : async Bool {
-    if (password == ADMIN_PASSWORD) {
-      accessControlState.userRoles.add(caller, #admin);
-      accessControlState.adminAssigned := true;
-      true;
-    } else {
-      false;
     };
   };
 
@@ -84,9 +78,7 @@ actor {
   module Service {
     public func compare(a : Service, b : Service) : Order.Order {
       switch (Nat.compare(a.order, b.order)) {
-        case (#equal) {
-          Nat.compare(a.id, b.id);
-        };
+        case (#equal) { Nat.compare(a.id, b.id) };
         case (other) { other };
       };
     };
@@ -95,9 +87,7 @@ actor {
   module TeamMember {
     public func compare(a : TeamMember, b : TeamMember) : Order.Order {
       switch (Nat.compare(a.order, b.order)) {
-        case (#equal) {
-          Nat.compare(a.id, b.id);
-        };
+        case (#equal) { Nat.compare(a.id, b.id) };
         case (other) { other };
       };
     };
@@ -106,10 +96,8 @@ actor {
   // Persistent State
   // ================
 
-  // User profiles
   let userProfiles = Map.empty<Principal, UserProfile>();
 
-  // Site content state, using seed values
   var contentState : ContentState = {
     heroHeadline = "Elevate Your Business with DataForge";
     heroSubheading = "Data-Driven Solutions for the Modern Enterprise";
@@ -128,153 +116,166 @@ actor {
   var nextContactId = 1;
 
   // Stable Initialization for Seeding
-  // ================================
+  // ==================================
 
   func seedServices() {
     let initialServices = [
-      {
-        id = 0;
-        title = "ESG & Sustainability Data Research";
-        description = "Comprehensive analysis and reporting on environmental, social, and governance metrics.";
-        icon = "leaf";
-        order = 1;
-        isActive = true;
-      },
-      {
-        id = 0;
-        title = "Data Mining";
-        description = "Extract meaningful patterns and insights from large datasets with advanced data mining tools.";
-        icon = "database";
-        order = 2;
-        isActive = true;
-      },
-      {
-        id = 0;
-        title = "Web Scraping";
-        description = "Automated collection and structuring of data from public sources to support business intelligence.";
-        icon = "browser";
-        order = 3;
-        isActive = true;
-      },
-      {
-        id = 0;
-        title = "Lead Generation & Email Finding";
-        description = "Identify potential clients and gather verified contact information using targeted research techniques.";
-        icon = "mail";
-        order = 4;
-        isActive = true;
-      },
-      {
-        id = 0;
-        title = "Data Entry & Processing";
-        description = "Efficient handling and organization of large volumes of data for streamlined workflows.";
-        icon = "edit";
-        order = 5;
-        isActive = true;
-      },
+      { id = 0; title = "ESG & Sustainability Data Research"; description = "Comprehensive analysis and reporting on environmental, social, and governance metrics."; icon = "leaf"; order = 1; isActive = true },
+      { id = 0; title = "Data Mining"; description = "Extract meaningful patterns and insights from large datasets with advanced data mining tools."; icon = "database"; order = 2; isActive = true },
+      { id = 0; title = "Web Scraping"; description = "Automated collection and structuring of data from public sources to support business intelligence."; icon = "globe"; order = 3; isActive = true },
+      { id = 0; title = "Lead Generation & Email Finding"; description = "Identify potential clients and gather verified contact information using targeted research techniques."; icon = "mail"; order = 4; isActive = true },
+      { id = 0; title = "Data Entry & Processing"; description = "Efficient handling and organization of large volumes of data for streamlined workflows."; icon = "clipboard"; order = 5; isActive = true },
     ];
-
     for (service in initialServices.values()) {
-      let newService = {
-        service with
-        id = nextServiceId;
-      };
-
-      servicesMap.add(nextServiceId, newService);
+      servicesMap.add(nextServiceId, { service with id = nextServiceId });
       nextServiceId += 1;
     };
   };
 
   func seedTeamMembers() {
     let initialTeam = [
-      {
-        id = 0;
-        name = "Karan Vishwakarma";
-        role = "CEO & Founder";
-        bio = "Experienced data strategist and business leader driving DataForge's vision.";
-        order = 1;
-        isActive = true;
-      },
-      {
-        id = 0;
-        name = "Neha Soni";
-        role = "Co-Founder";
-        bio = "Expert in data analysis and business operations, co-leading DataForge's growth.";
-        order = 2;
-        isActive = true;
-      },
+      { id = 0; name = "Karan Vishwakarma"; role = "CEO & Founder"; bio = "Experienced data strategist and business leader driving DataForge's vision."; order = 1; isActive = true },
+      { id = 0; name = "Neha Soni"; role = "Co-Founder"; bio = "Expert in data analysis and business operations, co-leading DataForge's growth."; order = 2; isActive = true },
     ];
-
     for (member in initialTeam.values()) {
-      let newMember = {
-        member with
-        id = nextTeamMemberId;
-      };
-      teamMap.add(nextTeamMemberId, newMember);
+      teamMap.add(nextTeamMemberId, { member with id = nextTeamMemberId });
       nextTeamMemberId += 1;
     };
   };
 
   // User Profile Management
-  // ======================
+  // =======================
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
-    };
     userProfiles.get(caller);
   };
 
   public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
     if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
+      Runtime.trap("Unauthorized");
     };
     userProfiles.get(user);
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
-    };
     userProfiles.add(caller, profile);
   };
 
-  // Site Content Management
-  // ======================
+  // Password-Based Admin API (no Internet Identity required)
+  // ========================================================
+
+  public shared func adminVerifyPassword(password : Text) : async Bool {
+    isValidAdmin(password);
+  };
+
+  public shared func adminGetContactSubmissions(password : Text) : async ?[ContactSubmission] {
+    if (not isValidAdmin(password)) return null;
+    ?contactSubmissions.values().toList<ContactSubmission>().toArray();
+  };
+
+  public shared func adminUpdateContent(password : Text, newContent : ContentState) : async Bool {
+    if (not isValidAdmin(password)) return false;
+    contentState := newContent;
+    true;
+  };
+
+  public shared func adminCreateService(password : Text, service : Service) : async ?Nat {
+    if (not isValidAdmin(password)) return null;
+    let newId = nextServiceId;
+    servicesMap.add(newId, { service with id = newId });
+    nextServiceId += 1;
+    ?newId;
+  };
+
+  public shared func adminUpdateService(password : Text, service : Service) : async Bool {
+    if (not isValidAdmin(password)) return false;
+    if (not servicesMap.containsKey(service.id)) return false;
+    servicesMap.add(service.id, service);
+    true;
+  };
+
+  public shared func adminDeleteService(password : Text, id : Nat) : async Bool {
+    if (not isValidAdmin(password)) return false;
+    servicesMap.remove(id);
+    true;
+  };
+
+  public shared func adminCreateTeamMember(password : Text, member : TeamMember) : async ?Nat {
+    if (not isValidAdmin(password)) return null;
+    let newId = nextTeamMemberId;
+    teamMap.add(newId, { member with id = newId });
+    nextTeamMemberId += 1;
+    ?newId;
+  };
+
+  public shared func adminUpdateTeamMember(password : Text, member : TeamMember) : async Bool {
+    if (not isValidAdmin(password)) return false;
+    if (not teamMap.containsKey(member.id)) return false;
+    teamMap.add(member.id, member);
+    true;
+  };
+
+  public shared func adminDeleteTeamMember(password : Text, id : Nat) : async Bool {
+    if (not isValidAdmin(password)) return false;
+    teamMap.remove(id);
+    true;
+  };
+
+  // Public Site Content
+  // ===================
 
   public query func getContent() : async ContentState {
     contentState;
   };
+
+  public query func getServices() : async [Service] {
+    servicesMap.values().toList<Service>().toArray().sort();
+  };
+
+  public query func getTeam() : async [TeamMember] {
+    teamMap.values().toList<TeamMember>().toArray().sort();
+  };
+
+  // Contact Form
+  // ============
+
+  public shared func submitContactForm(submission : ContactSubmission) : async Nat {
+    let newId = nextContactId;
+    contactSubmissions.add(newId, { submission with id = newId; timestamp = Time.now() });
+    nextContactId += 1;
+    newId;
+  };
+
+  // Legacy II-based admin (kept for compatibility)
+  // ================================================
+
+  public shared ({ caller }) func claimAdminWithPassword(password : Text) : async Bool {
+    if (isValidAdmin(password)) {
+      accessControlState.userRoles.remove(caller);
+      accessControlState.userRoles.add(caller, #admin);
+      accessControlState.adminAssigned := true;
+      true;
+    } else {
+      false;
+    };
+  };
+
 
   public shared ({ caller }) func updateContent(newContent : ContentState) : async () {
     assertAdmin(caller);
     contentState := newContent;
   };
 
-  // Service Management
-  // ==================
-
-  public query func getServices() : async [Service] {
-    servicesMap.values().toList<Service>().toArray().sort();
-  };
-
   public shared ({ caller }) func createService(service : Service) : async Nat {
     assertAdmin(caller);
     let newId = nextServiceId;
-    let newService = {
-      service with
-      id = newId;
-    };
-    servicesMap.add(newId, newService);
+    servicesMap.add(newId, { service with id = newId });
     nextServiceId += 1;
     newId;
   };
 
   public shared ({ caller }) func updateService(service : Service) : async () {
     assertAdmin(caller);
-    if (not servicesMap.containsKey(service.id)) {
-      Runtime.trap("Service not found");
-    };
     servicesMap.add(service.id, service);
   };
 
@@ -283,51 +284,22 @@ actor {
     servicesMap.remove(id);
   };
 
-  // Team Management
-  // ===============
-
-  public query func getTeam() : async [TeamMember] {
-    teamMap.values().toList<TeamMember>().toArray().sort();
-  };
-
   public shared ({ caller }) func createTeamMember(member : TeamMember) : async Nat {
     assertAdmin(caller);
     let newId = nextTeamMemberId;
-    let newMember = {
-      member with
-      id = newId;
-    };
-    teamMap.add(newId, newMember);
+    teamMap.add(newId, { member with id = newId });
     nextTeamMemberId += 1;
     newId;
   };
 
   public shared ({ caller }) func updateTeamMember(member : TeamMember) : async () {
     assertAdmin(caller);
-    if (not teamMap.containsKey(member.id)) {
-      Runtime.trap("Team member not found");
-    };
     teamMap.add(member.id, member);
   };
 
   public shared ({ caller }) func deleteTeamMember(id : Nat) : async () {
     assertAdmin(caller);
     teamMap.remove(id);
-  };
-
-  // Contact Form Submissions
-  // =======================
-
-  public shared ({ caller }) func submitContactForm(submission : ContactSubmission) : async Nat {
-    let newId = nextContactId;
-    let newSubmission = {
-      submission with
-      id = newId;
-      timestamp = Time.now();
-    };
-    contactSubmissions.add(newId, newSubmission);
-    nextContactId += 1;
-    newId;
   };
 
   public query ({ caller }) func getContactSubmissions() : async [ContactSubmission] {
