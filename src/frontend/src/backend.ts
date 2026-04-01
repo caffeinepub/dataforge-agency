@@ -112,6 +112,16 @@ export interface ContentState {
     heroHeadline: string;
     heroSubheading: string;
 }
+export interface ContactInfo {
+    phone: string;
+    email: string;
+    enterpriseEmail: string;
+    linkedIn: string;
+    twitter: string;
+    instagram: string;
+    address: string;
+    city: string;
+}
 export interface ContactSubmission {
     id: bigint;
     name: string;
@@ -140,6 +150,7 @@ export interface backendInterface {
     getCallerUserRole(): Promise<UserRole>;
     getContactSubmissions(): Promise<Array<ContactSubmission>>;
     getContent(): Promise<ContentState>;
+    getContactInfo(): Promise<ContactInfo>;
     getServices(): Promise<Array<Service>>;
     getTeam(): Promise<Array<TeamMember>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
@@ -149,6 +160,7 @@ export interface backendInterface {
     updateContent(newContent: ContentState): Promise<void>;
     updateService(service: Service): Promise<void>;
     updateTeamMember(member: TeamMember): Promise<void>;
+    adminUpdateContactInfo(password: string, info: ContactInfo): Promise<boolean>;
 }
 import type { UserProfile as _UserProfile, UserRole as _UserRole } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -304,6 +316,34 @@ export class Backend implements backendInterface {
             }
         } else {
             const result = await this.actor.getContent();
+            return result;
+        }
+    }
+    async getContactInfo(): Promise<ContactInfo> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getContactInfo();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getContactInfo();
+            return result;
+        }
+    }
+    async adminUpdateContactInfo(arg0: string, arg1: ContactInfo): Promise<boolean> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.adminUpdateContactInfo(arg0, arg1);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.adminUpdateContactInfo(arg0, arg1);
             return result;
         }
     }

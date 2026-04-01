@@ -25,7 +25,7 @@ const DEFAULT_CONTACT: ContactInfo = {
 };
 
 export default function Contact() {
-  const { actor } = useActor();
+  const { actor, isFetching } = useActor();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -39,12 +39,15 @@ export default function Contact() {
   const [loadingContact, setLoadingContact] = useState(true);
 
   useEffect(() => {
-    if (!actor) return;
+    if (isFetching) return;
+    if (!actor) {
+      setLoadingContact(false);
+      return;
+    }
     (actor as any)
       .getContactInfo()
       .then((ci) => {
         if (ci) {
-          // Merge with defaults so empty fields fall back gracefully
           setContactInfo({
             phone: ci.phone || DEFAULT_CONTACT.phone,
             email: ci.email || DEFAULT_CONTACT.email,
@@ -60,18 +63,18 @@ export default function Contact() {
       })
       .catch(() => {})
       .finally(() => setLoadingContact(false));
-  }, [actor]);
+  }, [actor, isFetching]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!actor) {
-      setFormError("Service unavailable. Please try again shortly.");
+      setFormError("Please wait a moment and try again.");
       return;
     }
     setSending(true);
     setFormError("");
     try {
-      await actor.submitContactForm({
+      await (actor as any).submitContactForm({
         id: 0n,
         name: form.name,
         email: form.email,
