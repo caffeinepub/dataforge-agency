@@ -1,7 +1,28 @@
-import { CheckCircle2, Clock, Mail, MapPin, Phone } from "lucide-react";
-import { useState } from "react";
+import {
+  CheckCircle2,
+  Clock,
+  Instagram,
+  Linkedin,
+  Mail,
+  MapPin,
+  Phone,
+  Twitter,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import AnimatedSection from "../components/AnimatedSection";
 import { useActor } from "../hooks/useActor";
+import type { ContactInfo } from "../types/contactInfo";
+
+const DEFAULT_CONTACT: ContactInfo = {
+  phone: "+91 7987254547",
+  email: "hello@dataforge.ai",
+  enterpriseEmail: "enterprise@dataforge.ai",
+  linkedIn: "",
+  twitter: "",
+  instagram: "",
+  address: "Sagar, Madhya Pradesh",
+  city: "India 470002",
+};
 
 export default function Contact() {
   const { actor } = useActor();
@@ -14,6 +35,32 @@ export default function Contact() {
   const [sending, setSending] = useState(false);
   const [success, setSuccess] = useState(false);
   const [formError, setFormError] = useState("");
+  const [contactInfo, setContactInfo] = useState<ContactInfo>(DEFAULT_CONTACT);
+  const [loadingContact, setLoadingContact] = useState(true);
+
+  useEffect(() => {
+    if (!actor) return;
+    (actor as any)
+      .getContactInfo()
+      .then((ci) => {
+        if (ci) {
+          // Merge with defaults so empty fields fall back gracefully
+          setContactInfo({
+            phone: ci.phone || DEFAULT_CONTACT.phone,
+            email: ci.email || DEFAULT_CONTACT.email,
+            enterpriseEmail:
+              ci.enterpriseEmail || DEFAULT_CONTACT.enterpriseEmail,
+            linkedIn: ci.linkedIn || "",
+            twitter: ci.twitter || "",
+            instagram: ci.instagram || "",
+            address: ci.address || DEFAULT_CONTACT.address,
+            city: ci.city || DEFAULT_CONTACT.city,
+          });
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingContact(false));
+  }, [actor]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,14 +122,26 @@ export default function Contact() {
                     <p className="text-white font-semibold text-sm mb-1">
                       Email Us
                     </p>
-                    <p className="text-slate-400 text-sm">hello@dataforge.ai</p>
-                    <p className="text-slate-400 text-sm">
-                      enterprise@dataforge.ai
-                    </p>
+                    {loadingContact ? (
+                      <div className="space-y-1">
+                        <div className="h-4 w-40 bg-white/5 rounded animate-pulse" />
+                        <div className="h-4 w-44 bg-white/5 rounded animate-pulse" />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-slate-400 text-sm">
+                          {contactInfo.email}
+                        </p>
+                        <p className="text-slate-400 text-sm">
+                          {contactInfo.enterpriseEmail}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
             </AnimatedSection>
+
             <AnimatedSection delay={80}>
               <div className="df-card p-6">
                 <div className="flex items-start gap-4">
@@ -93,11 +152,18 @@ export default function Contact() {
                     <p className="text-white font-semibold text-sm mb-1">
                       Call Us
                     </p>
-                    <p className="text-slate-400 text-sm">+91 7987254547</p>
+                    {loadingContact ? (
+                      <div className="h-4 w-32 bg-white/5 rounded animate-pulse" />
+                    ) : (
+                      <p className="text-slate-400 text-sm">
+                        {contactInfo.phone}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
             </AnimatedSection>
+
             <AnimatedSection delay={160}>
               <div className="df-card p-6">
                 <div className="flex items-start gap-4">
@@ -108,14 +174,95 @@ export default function Contact() {
                     <p className="text-white font-semibold text-sm mb-1">
                       Our Office
                     </p>
-                    <p className="text-slate-400 text-sm">
-                      Sagar, Madhya Pradesh
-                    </p>
-                    <p className="text-slate-400 text-sm">India 470002</p>
+                    {loadingContact ? (
+                      <div className="space-y-1">
+                        <div className="h-4 w-36 bg-white/5 rounded animate-pulse" />
+                        <div className="h-4 w-24 bg-white/5 rounded animate-pulse" />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-slate-400 text-sm">
+                          {contactInfo.address}
+                        </p>
+                        <p className="text-slate-400 text-sm">
+                          {contactInfo.city}
+                        </p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
             </AnimatedSection>
+
+            {!loadingContact && contactInfo.linkedIn && (
+              <AnimatedSection delay={220}>
+                <a
+                  href={contactInfo.linkedIn}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="df-card p-6 flex items-start gap-4 hover:border-cyan-400/30 transition-all block"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                    <Linkedin className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm mb-1">
+                      LinkedIn
+                    </p>
+                    <p className="text-slate-400 text-sm truncate max-w-[180px]">
+                      {contactInfo.linkedIn}
+                    </p>
+                  </div>
+                </a>
+              </AnimatedSection>
+            )}
+
+            {!loadingContact && contactInfo.twitter && (
+              <AnimatedSection delay={260}>
+                <a
+                  href={contactInfo.twitter}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="df-card p-6 flex items-start gap-4 hover:border-cyan-400/30 transition-all block"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                    <Twitter className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm mb-1">
+                      Twitter / X
+                    </p>
+                    <p className="text-slate-400 text-sm truncate max-w-[180px]">
+                      {contactInfo.twitter}
+                    </p>
+                  </div>
+                </a>
+              </AnimatedSection>
+            )}
+
+            {!loadingContact && contactInfo.instagram && (
+              <AnimatedSection delay={300}>
+                <a
+                  href={contactInfo.instagram}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="df-card p-6 flex items-start gap-4 hover:border-cyan-400/30 transition-all block"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-cyan-400/10 border border-cyan-400/20 flex items-center justify-center flex-shrink-0">
+                    <Instagram className="w-5 h-5 text-cyan-400" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm mb-1">
+                      Instagram
+                    </p>
+                    <p className="text-slate-400 text-sm truncate max-w-[180px]">
+                      {contactInfo.instagram}
+                    </p>
+                  </div>
+                </a>
+              </AnimatedSection>
+            )}
+
             <AnimatedSection delay={240}>
               <div className="df-card p-6">
                 <div className="flex items-start gap-4">
@@ -174,6 +321,7 @@ export default function Contact() {
                         </label>
                         <input
                           id="contact-name"
+                          data-ocid="contact.input"
                           type="text"
                           required
                           value={form.name}
@@ -242,10 +390,16 @@ export default function Contact() {
                       />
                     </div>
                     {formError && (
-                      <p className="text-red-400 text-sm">{formError}</p>
+                      <p
+                        className="text-red-400 text-sm"
+                        data-ocid="contactform.error_state"
+                      >
+                        {formError}
+                      </p>
                     )}
                     <button
                       type="submit"
+                      data-ocid="contactform.submit_button"
                       disabled={sending}
                       className="btn-gradient text-white font-bold px-8 py-3.5 rounded-full w-full disabled:opacity-60 disabled:cursor-not-allowed"
                     >

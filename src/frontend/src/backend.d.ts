@@ -30,6 +30,16 @@ export interface ContentState {
     heroHeadline: string;
     heroSubheading: string;
 }
+export interface ContactInfo {
+    phone: string;
+    email: string;
+    enterpriseEmail: string;
+    linkedIn: string;
+    twitter: string;
+    instagram: string;
+    address: string;
+    city: string;
+}
 export interface ContactSubmission {
     id: bigint;
     name: string;
@@ -57,6 +67,7 @@ export interface backendInterface {
     getCallerUserRole(): Promise<UserRole>;
     getContactSubmissions(): Promise<Array<ContactSubmission>>;
     getContent(): Promise<ContentState>;
+    getContactInfo(): Promise<ContactInfo>;
     getServices(): Promise<Array<Service>>;
     getTeam(): Promise<Array<TeamMember>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
@@ -66,4 +77,5 @@ export interface backendInterface {
     updateContent(newContent: ContentState): Promise<void>;
     updateService(service: Service): Promise<void>;
     updateTeamMember(member: TeamMember): Promise<void>;
+    adminUpdateContactInfo(password: string, info: ContactInfo): Promise<boolean>;
 }

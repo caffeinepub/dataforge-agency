@@ -4,6 +4,7 @@ import {
   Key,
   MessageSquare,
   Pencil,
+  Phone,
   Plus,
   Save,
   Shield,
@@ -20,10 +21,22 @@ import type {
 } from "../backend";
 import AnimatedSection from "../components/AnimatedSection";
 import { useActor } from "../hooks/useActor";
+import type { ContactInfo } from "../types/contactInfo";
 
-type Tab = "content" | "services" | "team" | "submissions";
+type Tab = "content" | "services" | "team" | "submissions" | "contact";
 
 const SESSION_KEY = "df_admin_session";
+
+const DEFAULT_CONTACT_INFO: ContactInfo = {
+  phone: "",
+  email: "",
+  enterpriseEmail: "",
+  linkedIn: "",
+  twitter: "",
+  instagram: "",
+  address: "",
+  city: "",
+};
 
 export default function Admin() {
   const { actor } = useActor();
@@ -53,6 +66,11 @@ export default function Admin() {
 
   const [submissions, setSubmissions] = useState<ContactSubmission[]>([]);
 
+  const [contactInfo, setContactInfo] =
+    useState<ContactInfo>(DEFAULT_CONTACT_INFO);
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactSaved, setContactSaved] = useState(false);
+
   const savedPassword = sessionStorage.getItem(`${SESSION_KEY}_pw`) || "";
 
   const loadData = useCallback(async () => {
@@ -60,11 +78,12 @@ export default function Admin() {
     const pw = sessionStorage.getItem(`${SESSION_KEY}_pw`) || "";
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const a = actor as any;
-    const [s, t, c, subResult] = await Promise.all([
+    const [s, t, c, subResult, ci] = await Promise.all([
       actor.getServices(),
       actor.getTeam(),
       actor.getContent(),
       a.adminGetContactSubmissions(pw),
+      (actor as any).getContactInfo(),
     ]);
     setServices(
       s.sort((a: Service, b: Service) => Number(a.order) - Number(b.order)),
@@ -76,6 +95,7 @@ export default function Admin() {
     );
     setContent(c);
     if (subResult?.[0]) setSubmissions(subResult[0]);
+    if (ci) setContactInfo(ci);
   }, [actor]);
 
   useEffect(() => {
@@ -88,8 +108,7 @@ export default function Admin() {
     if (!password.trim()) return;
     setVerifying(true);
     setLoginError("");
-    // Check password client-side -- no backend call needed for auth
-    await new Promise((r) => setTimeout(r, 300)); // small delay for UX
+    await new Promise((r) => setTimeout(r, 300));
     if (password.trim() === ADMIN_PASSWORD) {
       sessionStorage.setItem(SESSION_KEY, "1");
       sessionStorage.setItem(`${SESSION_KEY}_pw`, password.trim());
@@ -120,6 +139,19 @@ export default function Admin() {
       setTimeout(() => setContentSaved(false), 3000);
     } finally {
       setContentSaving(false);
+    }
+  };
+
+  const saveContactInfo = async () => {
+    if (!actor) return;
+    setContactSaving(true);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (actor as any).adminUpdateContactInfo(getPw(), contactInfo);
+      setContactSaved(true);
+      setTimeout(() => setContactSaved(false), 3000);
+    } finally {
+      setContactSaving(false);
     }
   };
 
@@ -196,6 +228,7 @@ export default function Admin() {
                 </label>
                 <input
                   id="admin-password"
+                  data-ocid="admin.input"
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -206,10 +239,16 @@ export default function Admin() {
                 />
               </div>
               {loginError && (
-                <p className="text-red-400 text-sm">{loginError}</p>
+                <p
+                  className="text-red-400 text-sm"
+                  data-ocid="admin.error_state"
+                >
+                  {loginError}
+                </p>
               )}
               <button
                 type="button"
+                data-ocid="admin.submit_button"
                 onClick={handleLogin}
                 disabled={verifying || !password.trim()}
                 className="btn-gradient text-white font-bold px-8 py-3.5 rounded-full w-full flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -241,6 +280,11 @@ export default function Admin() {
       label: "Inquiries",
       icon: <MessageSquare className="w-4 h-4" />,
     },
+    {
+      id: "contact",
+      label: "Contact Info",
+      icon: <Phone className="w-4 h-4" />,
+    },
   ];
 
   return (
@@ -268,6 +312,7 @@ export default function Admin() {
           <button
             type="button"
             key={tab.id}
+            data-ocid={`admin.${tab.id}.tab`}
             onClick={() => setActiveTab(tab.id)}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-semibold transition-all ${
               activeTab === tab.id
@@ -520,6 +565,211 @@ export default function Admin() {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === "contact" && (
+        <div className="df-card p-8 max-w-2xl">
+          <h2 className="text-white font-bold text-xl mb-2">Contact Info</h2>
+          <p className="text-slate-400 text-sm mb-6">
+            Update the phone number, email addresses, social links, and office
+            location shown on the Contact page.
+          </p>
+          <div className="space-y-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label
+                  htmlFor="ci-phone"
+                  className="block text-slate-300 text-sm font-medium mb-1.5"
+                >
+                  Phone Number
+                </label>
+                <input
+                  id="ci-phone"
+                  data-ocid="contact.input"
+                  type="text"
+                  value={contactInfo.phone}
+                  onChange={(e) =>
+                    setContactInfo({ ...contactInfo, phone: e.target.value })
+                  }
+                  placeholder="+91 XXXXXXXXXX"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="ci-email"
+                  className="block text-slate-300 text-sm font-medium mb-1.5"
+                >
+                  General Email
+                </label>
+                <input
+                  id="ci-email"
+                  type="email"
+                  value={contactInfo.email}
+                  onChange={(e) =>
+                    setContactInfo({ ...contactInfo, email: e.target.value })
+                  }
+                  placeholder="hello@yourdomain.com"
+                  className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+                />
+              </div>
+            </div>
+            <div>
+              <label
+                htmlFor="ci-enterprise-email"
+                className="block text-slate-300 text-sm font-medium mb-1.5"
+              >
+                Enterprise Email
+              </label>
+              <input
+                id="ci-enterprise-email"
+                type="email"
+                value={contactInfo.enterpriseEmail}
+                onChange={(e) =>
+                  setContactInfo({
+                    ...contactInfo,
+                    enterpriseEmail: e.target.value,
+                  })
+                }
+                placeholder="enterprise@yourdomain.com"
+                className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+              />
+            </div>
+
+            <div className="border-t border-white/10 pt-5">
+              <p className="text-slate-300 text-sm font-semibold mb-4">
+                Social Links
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label
+                    htmlFor="ci-linkedin"
+                    className="block text-slate-300 text-sm font-medium mb-1.5"
+                  >
+                    LinkedIn URL
+                  </label>
+                  <input
+                    id="ci-linkedin"
+                    type="url"
+                    value={contactInfo.linkedIn}
+                    onChange={(e) =>
+                      setContactInfo({
+                        ...contactInfo,
+                        linkedIn: e.target.value,
+                      })
+                    }
+                    placeholder="https://linkedin.com/company/..."
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="ci-twitter"
+                    className="block text-slate-300 text-sm font-medium mb-1.5"
+                  >
+                    Twitter / X URL
+                  </label>
+                  <input
+                    id="ci-twitter"
+                    type="url"
+                    value={contactInfo.twitter}
+                    onChange={(e) =>
+                      setContactInfo({
+                        ...contactInfo,
+                        twitter: e.target.value,
+                      })
+                    }
+                    placeholder="https://twitter.com/..."
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="ci-instagram"
+                    className="block text-slate-300 text-sm font-medium mb-1.5"
+                  >
+                    Instagram URL
+                  </label>
+                  <input
+                    id="ci-instagram"
+                    type="url"
+                    value={contactInfo.instagram}
+                    onChange={(e) =>
+                      setContactInfo({
+                        ...contactInfo,
+                        instagram: e.target.value,
+                      })
+                    }
+                    placeholder="https://instagram.com/..."
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-white/10 pt-5">
+              <p className="text-slate-300 text-sm font-semibold mb-4">
+                Office Location
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <label
+                    htmlFor="ci-address"
+                    className="block text-slate-300 text-sm font-medium mb-1.5"
+                  >
+                    Address / Area
+                  </label>
+                  <input
+                    id="ci-address"
+                    type="text"
+                    value={contactInfo.address}
+                    onChange={(e) =>
+                      setContactInfo({
+                        ...contactInfo,
+                        address: e.target.value,
+                      })
+                    }
+                    placeholder="Sagar, Madhya Pradesh"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="ci-city"
+                    className="block text-slate-300 text-sm font-medium mb-1.5"
+                  >
+                    City / PIN
+                  </label>
+                  <input
+                    id="ci-city"
+                    type="text"
+                    value={contactInfo.city}
+                    onChange={(e) =>
+                      setContactInfo({ ...contactInfo, city: e.target.value })
+                    }
+                    placeholder="India 470002"
+                    className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white text-sm focus:outline-none focus:border-cyan-400/50 transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              data-ocid="contact.save_button"
+              onClick={saveContactInfo}
+              disabled={contactSaving}
+              className="btn-gradient text-white font-bold px-6 py-3 rounded-full flex items-center gap-2 disabled:opacity-60"
+            >
+              <Save className="w-4 h-4" />
+              {contactSaved
+                ? "Saved!"
+                : contactSaving
+                  ? "Saving..."
+                  : "Save Contact Info"}
+            </button>
+          </div>
         </div>
       )}
     </div>

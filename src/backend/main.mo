@@ -12,32 +12,22 @@ import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
 
 actor {
-  // Authorization
-  // =============
-
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
 
-  // Hardcoded admin password
   let ADMIN_PASSWORD = "DataForge@2024";
 
   func isValidAdmin(password : Text) : Bool {
     password == ADMIN_PASSWORD;
   };
 
-  // Helper function for admin authorization
   func assertAdmin(caller : Principal) {
     if (not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Only admins can perform this action");
     };
   };
 
-  // Content Types
-  // =============
-
-  public type UserProfile = {
-    name : Text;
-  };
+  public type UserProfile = { name : Text };
 
   type ContentState = {
     heroHeadline : Text;
@@ -45,6 +35,17 @@ actor {
     tagline : Text;
     aboutText : Text;
     ctaButtonText : Text;
+  };
+
+  type ContactInfo = {
+    phone : Text;
+    email : Text;
+    enterpriseEmail : Text;
+    linkedIn : Text;
+    twitter : Text;
+    instagram : Text;
+    address : Text;
+    city : Text;
   };
 
   type Service = {
@@ -74,7 +75,6 @@ actor {
     timestamp : Int;
   };
 
-  // Compare by order, then by id
   module Service {
     public func compare(a : Service, b : Service) : Order.Order {
       switch (Nat.compare(a.order, b.order)) {
@@ -93,9 +93,6 @@ actor {
     };
   };
 
-  // Persistent State
-  // ================
-
   let userProfiles = Map.empty<Principal, UserProfile>();
 
   var contentState : ContentState = {
@@ -106,6 +103,17 @@ actor {
     ctaButtonText = "Get Started";
   };
 
+  var contactInfo : ContactInfo = {
+    phone = "+91 7987254547";
+    email = "hello@dataforge.ai";
+    enterpriseEmail = "enterprise@dataforge.ai";
+    linkedIn = "";
+    twitter = "";
+    instagram = "";
+    address = "Sagar, Madhya Pradesh";
+    city = "India 470002";
+  };
+
   let servicesMap = Map.empty<Nat, Service>();
   var nextServiceId = 1;
 
@@ -114,9 +122,6 @@ actor {
 
   let contactSubmissions = Map.empty<Nat, ContactSubmission>();
   var nextContactId = 1;
-
-  // Stable Initialization for Seeding
-  // ==================================
 
   func seedServices() {
     let initialServices = [
@@ -143,9 +148,6 @@ actor {
     };
   };
 
-  // User Profile Management
-  // =======================
-
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     userProfiles.get(caller);
   };
@@ -161,9 +163,6 @@ actor {
     userProfiles.add(caller, profile);
   };
 
-  // Password-Based Admin API (no Internet Identity required)
-  // ========================================================
-
   public shared func adminVerifyPassword(password : Text) : async Bool {
     isValidAdmin(password);
   };
@@ -176,6 +175,12 @@ actor {
   public shared func adminUpdateContent(password : Text, newContent : ContentState) : async Bool {
     if (not isValidAdmin(password)) return false;
     contentState := newContent;
+    true;
+  };
+
+  public shared func adminUpdateContactInfo(password : Text, info : ContactInfo) : async Bool {
+    if (not isValidAdmin(password)) return false;
+    contactInfo := info;
     true;
   };
 
@@ -221,11 +226,12 @@ actor {
     true;
   };
 
-  // Public Site Content
-  // ===================
-
   public query func getContent() : async ContentState {
     contentState;
+  };
+
+  public query func getContactInfo() : async ContactInfo {
+    contactInfo;
   };
 
   public query func getServices() : async [Service] {
@@ -236,18 +242,12 @@ actor {
     teamMap.values().toList<TeamMember>().toArray().sort();
   };
 
-  // Contact Form
-  // ============
-
   public shared func submitContactForm(submission : ContactSubmission) : async Nat {
     let newId = nextContactId;
     contactSubmissions.add(newId, { submission with id = newId; timestamp = Time.now() });
     nextContactId += 1;
     newId;
   };
-
-  // Legacy II-based admin (kept for compatibility)
-  // ================================================
 
   public shared ({ caller }) func claimAdminWithPassword(password : Text) : async Bool {
     if (isValidAdmin(password)) {
@@ -259,7 +259,6 @@ actor {
       false;
     };
   };
-
 
   public shared ({ caller }) func updateContent(newContent : ContentState) : async () {
     assertAdmin(caller);
